@@ -4,6 +4,8 @@ import mss
 import pytesseract
 from PIL import Image
 
+
+
 # Paths to your template images
 VICTORY_TEMPLATE = "templates/victory.png"
 DEFEAT_TEMPLATE = "templates/defeat.png"
@@ -62,7 +64,6 @@ def extract_names(scr, icon_points, icon_width, icon_height, debug_img_path=None
 
     # Make a copy for debug drawing
     debug_img = scr.copy() if debug_img_path else None
-
     results = []
     for (x, y) in icon_points:
         left_x1 = x + left_offset_x
@@ -77,67 +78,74 @@ def extract_names(scr, icon_points, icon_width, icon_height, debug_img_path=None
 
         # Draw rectangles on debug image
         if debug_img is not None:
-            cv2.rectangle(debug_img, (left_x1, left_y1), (left_x2, left_y2), (255, 255, 0), 2)   # Cyan
-            cv2.rectangle(debug_img, (right_x1, right_y1), (right_x2, right_y2), (255, 0, 255), 2) # Magenta
+            cv2.rectangle(debug_img, (left_x1, left_y1), (left_x2, left_y2), (255, 255, 0), 2)
+            cv2.rectangle(debug_img, (right_x1, right_y1), (right_x2, right_y2), (255, 0, 255), 2)
 
-        # Crop regions and convert to PIL Image for pytesseract
-        left_img = Image.fromarray(scr[left_y1:left_y2, left_x1:left_x2])
-        right_img = Image.fromarray(scr[right_y1:right_y2, right_x1:right_x2])
+        # Crop regions and check bounds
+        left_crop = scr[max(0, left_y1):max(0, left_y2), max(0, left_x1):max(0, left_x2)]
+        right_crop = scr[max(0, right_y1):max(0, right_y2), max(0, right_x1):max(0, right_x2)]
 
-        left_name = pytesseract.image_to_string(left_img).strip()
-        right_name = pytesseract.image_to_string(right_img).strip()
+        # Only run OCR if the crop is not empty
+        if left_crop.size == 0 or right_crop.size == 0:
+            left_name = ""
+            right_name = ""
+        else:
+            left_img = Image.fromarray(left_crop)
+            right_img = Image.fromarray(right_crop)
+            left_name = pytesseract.image_to_string(left_img).strip()
+            right_name = pytesseract.image_to_string(right_img).strip()
 
         results.append((left_name, right_name))
 
-    # Save debug image if requested
     if debug_img_path and debug_img is not None:
         cv2.imwrite(debug_img_path, debug_img)
 
     return results
 
-# Grab screenshot
-with mss.mss() as sct:
-    mon = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
-    scr = np.array(sct.grab(mon))[:, :, :3].copy()
-scr_gray = cv2.cvtColor(scr, cv2.COLOR_BGR2GRAY)
+def report_victories():
+    # Grab screenshot
+    with mss.mss() as sct:
+        mon = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
+        scr = np.array(sct.grab(mon))[:, :, :3].copy()
+    scr_gray = cv2.cvtColor(scr, cv2.COLOR_BGR2GRAY)
 
-# Detect victories
-victory_points, vW, vH = detect_template(VICTORY_TEMPLATE, scr_gray)
-for pt in victory_points:
-    cv2.rectangle(scr, pt, (pt[0] + vW, pt[1] + vH), (0, 255, 0), 2)
+    # Detect victories
+    victory_points, vW, vH = detect_template(VICTORY_TEMPLATE, scr_gray)
+    for pt in victory_points:
+        cv2.rectangle(scr, pt, (pt[0] + vW, pt[1] + vH), (0, 255, 0), 2)
 
-# Detect defeats
-defeat_points, dW, dH = detect_template(DEFEAT_TEMPLATE, scr_gray)
-for pt in defeat_points:
-    cv2.rectangle(scr, pt, (pt[0] + dW, pt[1] + dH), (0, 0, 255), 2)
+    # Detect defeats
+    defeat_points, dW, dH = detect_template(DEFEAT_TEMPLATE, scr_gray)
+    for pt in defeat_points:
+        cv2.rectangle(scr, pt, (pt[0] + dW, pt[1] + dH), (0, 0, 255), 2)
 
-print(f"Victory image detected {len(victory_points)} time(s) on screen!")
-print(f"Defeat image detected {len(defeat_points)} time(s) on screen!")
+    # Save the result image with detections
+    cv2.imwrite("detection_result.png", scr)
 
-# Save the result image with detections
-cv2.imwrite("detection_result.png", scr)
+    # Combine victories and defeats with labels
+    all_results = [
+        *[(pt, 'victory', vW, vH) for pt in victory_points],
+        *[(pt, 'defeat', dW, dH) for pt in defeat_points]
+    ]
 
-# Sort detected icons by y-coordinate (top to bottom)
-victory_points_sorted = sorted(victory_points, key=lambda pt: pt[1])
-defeat_points_sorted = sorted(defeat_points, key=lambda pt: pt[1])
+    # Sort all by y-coordinate (top to bottom)
+    all_results_sorted = sorted(all_results, key=lambda item: item[0][1])
 
-# Use sorted lists for name extraction and reporting
-victory_names = extract_names(scr, victory_points_sorted, vW, vH, debug_img_path="victory_names_debug.png")
-defeat_names = extract_names(scr, defeat_points_sorted, dW, dH, debug_img_path="defeat_names_debug.png")
+    output = []
+    for idx, (pt, result_type, w, h) in enumerate(all_results_sorted):
+        names = extract_names(scr, [pt], w, h)
+        left, right = names[0]
+        output.append((result_type, left, right))
 
-# Combine victories and defeats with labels
-all_results = [
-    *[(pt, 'victory', vW, vH) for pt in victory_points],
-    *[(pt, 'defeat', dW, dH) for pt in defeat_points]
-]
+    return output
 
-# Sort all by y-coordinate (top to bottom)
-all_results_sorted = sorted(all_results, key=lambda item: item[0][1])
+if __name__ == "__main__":
 
-for idx, (pt, result_type, w, h) in enumerate(all_results_sorted):
-    names = extract_names(scr, [pt], w, h)
-    left, right = names[0]
-    if result_type == 'victory':
-        print(f"{idx+1}. Victory: {left} defeated {right}")
-    else:
-        print(f"{idx+1}. Defeat: {left} was defeated by {right}")
+    results = report_victories()
+    for idx, result in enumerate(results):
+        if result[0] == 'victory':
+            print(f"{idx+1}. Victory: {result[1]} defeated {result[2]}")
+        else:
+            print(f"{idx+1}. Defeat: {result[1]} was defeated by {result[2]}")
+
+    print("Victory report completed.")
