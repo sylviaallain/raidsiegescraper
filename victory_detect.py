@@ -54,11 +54,11 @@ def detect_template(template_path, screenshot, threshold=0.8):
 def extract_names(scr, icon_points, icon_width, icon_height, debug_img_path=None):
     # Offsets and box size (adjust as needed)
     left_offset_x = -310 
-    left_offset_y = -70 
+    left_offset_y = -80 
     right_offset_x = 175
-    right_offset_y = -70
+    right_offset_y = -80
     name_box_width = 275
-    name_box_height = 75
+    name_box_height = 50
 
     # Make a copy for debug drawing
     debug_img = scr.copy() if debug_img_path else None
