@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 import mss
+import pytesseract
+from PIL import Image
 
 # Paths to your template images
 VICTORY_TEMPLATE = "templates/victory.png"
@@ -49,6 +51,50 @@ def detect_template(template_path, screenshot, threshold=0.8):
     filtered_points = non_max_suppression(points, tW, tH, overlapThresh=0.3)
     return filtered_points, tW, tH
 
+def extract_names(scr, icon_points, icon_width, icon_height, debug_img_path=None):
+    # Offsets and box size (adjust as needed)
+    left_offset_x = -310 
+    left_offset_y = -70 
+    right_offset_x = 175
+    right_offset_y = -70
+    name_box_width = 275
+    name_box_height = 75
+
+    # Make a copy for debug drawing
+    debug_img = scr.copy() if debug_img_path else None
+
+    results = []
+    for (x, y) in icon_points:
+        left_x1 = x + left_offset_x
+        left_y1 = y + left_offset_y
+        left_x2 = left_x1 + name_box_width
+        left_y2 = left_y1 + name_box_height
+
+        right_x1 = x + right_offset_x
+        right_y1 = y + right_offset_y
+        right_x2 = right_x1 + name_box_width
+        right_y2 = right_y1 + name_box_height
+
+        # Draw rectangles on debug image
+        if debug_img is not None:
+            cv2.rectangle(debug_img, (left_x1, left_y1), (left_x2, left_y2), (255, 255, 0), 2)   # Cyan
+            cv2.rectangle(debug_img, (right_x1, right_y1), (right_x2, right_y2), (255, 0, 255), 2) # Magenta
+
+        # Crop regions and convert to PIL Image for pytesseract
+        left_img = Image.fromarray(scr[left_y1:left_y2, left_x1:left_x2])
+        right_img = Image.fromarray(scr[right_y1:right_y2, right_x1:right_x2])
+
+        left_name = pytesseract.image_to_string(left_img).strip()
+        right_name = pytesseract.image_to_string(right_img).strip()
+
+        results.append((left_name, right_name))
+
+    # Save debug image if requested
+    if debug_img_path and debug_img is not None:
+        cv2.imwrite(debug_img_path, debug_img)
+
+    return results
+
 # Grab screenshot
 with mss.mss() as sct:
     mon = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
@@ -70,3 +116,28 @@ print(f"Defeat image detected {len(defeat_points)} time(s) on screen!")
 
 # Save the result image with detections
 cv2.imwrite("detection_result.png", scr)
+
+# Sort detected icons by y-coordinate (top to bottom)
+victory_points_sorted = sorted(victory_points, key=lambda pt: pt[1])
+defeat_points_sorted = sorted(defeat_points, key=lambda pt: pt[1])
+
+# Use sorted lists for name extraction and reporting
+victory_names = extract_names(scr, victory_points_sorted, vW, vH, debug_img_path="victory_names_debug.png")
+defeat_names = extract_names(scr, defeat_points_sorted, dW, dH, debug_img_path="defeat_names_debug.png")
+
+# Combine victories and defeats with labels
+all_results = [
+    *[(pt, 'victory', vW, vH) for pt in victory_points],
+    *[(pt, 'defeat', dW, dH) for pt in defeat_points]
+]
+
+# Sort all by y-coordinate (top to bottom)
+all_results_sorted = sorted(all_results, key=lambda item: item[0][1])
+
+for idx, (pt, result_type, w, h) in enumerate(all_results_sorted):
+    names = extract_names(scr, [pt], w, h)
+    left, right = names[0]
+    if result_type == 'victory':
+        print(f"{idx+1}. Victory: {left} defeated {right}")
+    else:
+        print(f"{idx+1}. Defeat: {left} was defeated by {right}")
