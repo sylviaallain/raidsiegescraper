@@ -4,8 +4,8 @@ import numpy as np
 import cv2, mss, pyautogui as pag
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-TPL_PATH = os.path.join(BASE, "templates", "home/post_defeated.png")
-WIDTH, HEIGHT = 50, 55
+TPL_PATH = os.path.join(BASE, "templates", "victory.png")
+WIDTH, HEIGHT = 140, 75
 
 os.makedirs(os.path.dirname(TPL_PATH), exist_ok=True)
 
