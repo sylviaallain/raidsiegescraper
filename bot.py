@@ -30,7 +30,8 @@ posts = {
 }
 
 exit_coords = (1198, 429)
-defense_report_coords = (703, 112)
+tower_defense_report_coords = (703, 112)
+post_defense_report_coords = (422, 110)
 
 pyautogui.moveTo(*exit_coords)
 pyautogui.click()
