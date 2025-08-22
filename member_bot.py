@@ -5,6 +5,8 @@ import pytesseract
 import cv2
 import pyautogui
 import time
+import csv
+from datetime import datetime
 
 def read_single_line_item(upper_left, debug_img_path=None):
     # Field definitions: (x_offset, y_offset, width, height)
@@ -131,6 +133,24 @@ def scroll_and_read_all_items_drag(start_upper_left, scrollbar_coords, drag_pixe
         time.sleep(0.5)  # Wait for UI to update
     return all_results
 
+def save_to_csv(items, filename=None):
+    # Deduplicate by Player Name
+    deduped = {}
+    for item in items:
+        name = item.get("Player Name", "").strip()
+        if name and name not in deduped:
+            deduped[name] = item
+    # Write to CSV
+    fieldnames = ["Player Name", "Level", "Clan XP earned"]
+    if filename is None:
+        date_str = datetime.now().strftime("%Y_%m_%d")
+        filename = f"member_records/members_{date_str}.csv"
+    with open(filename, "w", newline='', encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for record in deduped.values():
+            writer.writerow(record)
+
 if __name__ == "__main__":
     # Set the coordinates for the scrollbar (x, y) where you want to start dragging
     scrollbar_coords = (1597, 1019)  # <-- Adjust to your scrollbar's position
@@ -146,10 +166,12 @@ if __name__ == "__main__":
         drag_pixels= -886,  # Has one overlapping member: -709,
         num_items_per_page=5,
         item_height=142,
-        num_pages=1,  # True pages = 6
+        num_pages=6,  # True pages = 6
         debug_img_path="debug/member_bot_allitems.png"
     )
     for idx, item in enumerate(all_items, 1):
         print(f"Line Item {idx}:")
         for k, v in item.items():
             print(f"  {k}: {v}")
+    # Save deduped results to CSV with date in filename
+    save_to_csv(all_items)
