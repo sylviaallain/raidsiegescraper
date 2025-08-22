@@ -3,6 +3,7 @@ import numpy as np
 import mss
 import pytesseract
 from PIL import Image
+import os
 
 
 
@@ -98,7 +99,14 @@ def extract_names(scr, icon_points, icon_width, icon_height, debug_img_path=None
         results.append((left_name, right_name))
 
     if debug_img_path and debug_img is not None:
-        cv2.imwrite(debug_img_path, debug_img)
+        # Always save under RaidSiegeData/debug/
+        debug_folder = os.path.join(os.path.dirname(__file__), "debug")
+        if not os.path.exists(debug_folder):
+            os.makedirs(debug_folder)
+        # Use only the filename part from debug_img_path
+        filename = os.path.basename(debug_img_path)
+        full_path = os.path.join(debug_folder, filename)
+        cv2.imwrite(full_path, debug_img)
 
     return results
 
@@ -120,7 +128,7 @@ def report_victories():
         cv2.rectangle(scr, pt, (pt[0] + dW, pt[1] + dH), (0, 0, 255), 2)
 
     # Save the result image with detections
-    cv2.imwrite("detection_result.png", scr)
+    cv2.imwrite("debug/detection_result.png", scr)
 
     # Combine victories and defeats with labels
     all_results = [

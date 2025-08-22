@@ -1,4 +1,4 @@
-# bot.py
+# siege_bot.py
 import pyautogui
 import time
 from victory_detect import report_victories
