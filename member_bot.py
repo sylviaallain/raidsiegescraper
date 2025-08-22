@@ -10,7 +10,7 @@ def read_single_line_item(upper_left, debug_img_path=None):
     # Field definitions: (x_offset, y_offset, width, height)
     fields = {
         "Player Name": (112, 16, 250, 55),
-        "Level": (53, 75, 45, 40),
+        "Level": (53, 81, 50, 29),
         "Clan XP earned": (895, 38, 110, 50)
     }
 
@@ -31,19 +31,21 @@ def read_single_line_item(upper_left, debug_img_path=None):
         # Crop region
         crop = scr[y1:y2, x1:x2]
         if field == "Level":
-            # Convert to grayscale
-            gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-            alpha = 2.0
-            beta = -160
-            contrasted = cv2.convertScaleAbs(gray, alpha=alpha, beta=beta)
-            _, thresh = cv2.threshold(contrasted, 180, 255, cv2.THRESH_BINARY)
-            kernel = np.ones((2,2), np.uint8)
-            cleaned = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-            img = Image.fromarray(cleaned)
-            # Upscale the image for better OCR
+            # Convert to HSV for color filtering
+            hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+            # Define a mask to keep only white (high V, low S)
+            lower_white = np.array([0, 0, 200])    # H: any, S: low, V: high
+            upper_white = np.array([180, 60, 255])
+            mask_white = cv2.inRange(hsv, lower_white, upper_white)
+            # Apply mask to original crop
+            filtered = cv2.bitwise_and(crop, crop, mask=mask_white)
+            # Convert to grayscale and threshold
+            gray = cv2.cvtColor(filtered, cv2.COLOR_BGR2GRAY)
+            _, thresh = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
+            img = Image.fromarray(thresh)
             img = img.resize((img.width * 3, img.height * 3), Image.BICUBIC)
             img.save(f"debug/level_field_{y1}_{x1}.png")
-            custom_config = r'--oem 3 --psm 10 -c tessedit_char_whitelist=0123456789'
+            custom_config = r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789'
             text = pytesseract.image_to_string(img, config=custom_config).strip()
         else:
             img = Image.fromarray(crop)
@@ -93,24 +95,6 @@ def read_all_line_items(start_upper_left, num_items=5, item_height=141, debug_im
 
     return results
 
-def scroll_and_read_all_items(start_upper_left, num_items_per_page=5, item_height=141, num_pages=3, scroll_amount=150, debug_img_path=None):
-    all_results = []
-    for page in range(num_pages):
-        # Read items on the current page
-        page_results = read_all_line_items(
-            start_upper_left=start_upper_left,
-            num_items=num_items_per_page,
-            item_height=item_height,
-            debug_img_path=f"debug/member_bot_allitems_page{page+1}.png" if debug_img_path else None
-        )
-        all_results.extend(page_results)
-        # Scroll down for next page (adjust scroll_amount as needed)
-        pyautogui.moveTo(start_upper_left[0], start_upper_left[1] + num_items_per_page * item_height)
-        pyautogui.scroll(-scroll_amount)
-        # Wait for UI to update
-        time.sleep(1)
-    return all_results
-
 def scroll_and_read_all_items_drag(start_upper_left, scrollbar_coords, drag_pixels=707, num_items_per_page=5, item_height=141, num_pages=2, debug_img_path=None):
     all_results = []
     for page in range(num_pages):
@@ -146,7 +130,7 @@ if __name__ == "__main__":
         drag_pixels=-709,
         num_items_per_page=5,
         item_height=142,
-        num_pages=7,
+        num_pages=7,  # True pages = 7
         debug_img_path="debug/member_bot_allitems.png"
     )
     for idx, item in enumerate(all_items, 1):
