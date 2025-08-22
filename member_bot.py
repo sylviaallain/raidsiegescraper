@@ -47,6 +47,15 @@ def read_single_line_item(upper_left, debug_img_path=None):
             img.save(f"debug/level_field_{y1}_{x1}.png")
             custom_config = r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789'
             text = pytesseract.image_to_string(img, config=custom_config).strip()
+
+            # After OCR:
+            try:
+                level_int = int(text)
+                if level_int > 100:
+                    level_int = level_int % 100
+                text = str(level_int)
+            except ValueError:
+                pass  # If OCR fails, keep original text
         else:
             img = Image.fromarray(crop)
             text = pytesseract.image_to_string(img).strip()
@@ -79,9 +88,9 @@ def read_all_line_items(start_upper_left, num_items=5, item_height=141, debug_im
         if debug_img is None:
             debug_img = scr.copy()
         for field, (x_off, y_off, w, h) in {
-            "Player Name": (112, 21, 250, 35),
-            "Level": (53, 83, 45, 25),
-            "Clan XP earned": (895, 45, 110, 35)
+                "Player Name": (112, 16, 250, 55),
+                "Level": (53, 81, 50, 29),
+                "Clan XP earned": (895, 38, 110, 50)
         }.items():
             x1 = upper_left[0] + x_off
             y1 = upper_left[1] + y_off
@@ -130,7 +139,7 @@ if __name__ == "__main__":
         drag_pixels=-709,
         num_items_per_page=5,
         item_height=142,
-        num_pages=7,  # True pages = 7
+        num_pages=8,  # True pages = 8
         debug_img_path="debug/member_bot_allitems.png"
     )
     for idx, item in enumerate(all_items, 1):
