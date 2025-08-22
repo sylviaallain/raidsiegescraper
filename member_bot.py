@@ -38,9 +38,10 @@ def read_single_line_item(upper_left, debug_img_path=None):
             kernel = np.ones((2,2), np.uint8)
             cleaned = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
             img = Image.fromarray(cleaned)
-            img = img.resize((img.width * 2, img.height * 2), Image.BICUBIC)
+            # Upscale the image for better OCR
+            img = img.resize((img.width * 3, img.height * 3), Image.BICUBIC)
             img.save(f"debug/level_field_{y1}_{x1}.png")
-            custom_config = r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789'
+            custom_config = r'--oem 3 --psm 10 -c tessedit_char_whitelist=0123456789'
             text = pytesseract.image_to_string(img, config=custom_config).strip()
         else:
             img = Image.fromarray(crop)
@@ -91,13 +92,6 @@ def read_all_line_items(start_upper_left, num_items=5, item_height=141, debug_im
     return results
 
 if __name__ == "__main__":
-    line_item = read_single_line_item(
-        upper_left=(339, 313),
-        debug_img_path="debug/member_bot_lineitem.png"
-    )
-    print("Line Item OCR Result:")
-    for k, v in line_item.items():
-        print(f"{k}: {v}")
 
     all_items = read_all_line_items(
         start_upper_left=(339, 313),
