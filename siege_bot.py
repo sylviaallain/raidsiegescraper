@@ -1,7 +1,6 @@
 # siege_bot.py
 import pyautogui
 import time
-from victory_detect import report_victories
 import mss
 import numpy as np
 from PIL import Image
