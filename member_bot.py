@@ -28,40 +28,47 @@ def read_single_line_item(upper_left, debug_img_path=None):
         x2 = x1 + w
         y2 = y1 + h
 
-        # Crop region
         crop = scr[y1:y2, x1:x2]
         if field == "Level":
-            # Convert to HSV for color filtering
             hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-            # Define a mask to keep only white (high V, low S)
-            lower_white = np.array([0, 0, 200])    # H: any, S: low, V: high
+            lower_white = np.array([0, 0, 200])
             upper_white = np.array([180, 60, 255])
             mask_white = cv2.inRange(hsv, lower_white, upper_white)
-            # Apply mask to original crop
             filtered = cv2.bitwise_and(crop, crop, mask=mask_white)
-            # Convert to grayscale and threshold
             gray = cv2.cvtColor(filtered, cv2.COLOR_BGR2GRAY)
             _, thresh = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
             img = Image.fromarray(thresh)
             img = img.resize((img.width * 3, img.height * 3), Image.BICUBIC)
-            img.save(f"debug/level_field_{y1}_{x1}.png")
             custom_config = r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789'
             text = pytesseract.image_to_string(img, config=custom_config).strip()
-
-            # After OCR:
             try:
                 level_int = int(text)
                 if level_int > 100:
                     level_int = level_int % 100
                 text = str(level_int)
             except ValueError:
-                pass  # If OCR fails, keep original text
+                pass
+        elif field == "Clan XP earned":
+            gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+            _, thresh = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY)
+            # Thicken digits using dilation
+            kernel = np.ones((2,2), np.uint8)  # You can try (3,3) for even thicker
+            thickened = cv2.dilate(thresh, kernel, iterations=1)
+            img = Image.fromarray(thickened)
+            img = img.resize((img.width * 10, img.height * 10), Image.BICUBIC)
+            from PIL import ImageFilter
+            img = img.filter(ImageFilter.SHARPEN)
+            custom_config = r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789,'
+            text = pytesseract.image_to_string(img, config=custom_config).strip()
+            img.save(f"debug/xp_field_{y1}_{x1}.png")
+            # If OCR detects '0', set field to 0
+            if text is None or text == "":
+                text = "0"
         else:
             img = Image.fromarray(crop)
             text = pytesseract.image_to_string(img).strip()
         results[field] = text
 
-        # Draw rectangle for debug
         cv2.rectangle(debug_img, (x1, y1), (x2, y2), (0, 255, 255), 2)
 
     # Optionally save debug image
@@ -136,10 +143,10 @@ if __name__ == "__main__":
     all_items = scroll_and_read_all_items_drag(
         start_upper_left=(339, 313),
         scrollbar_coords=scrollbar_coords,
-        drag_pixels=-709,
+        drag_pixels= -886,  # Has one overlapping member: -709,
         num_items_per_page=5,
         item_height=142,
-        num_pages=8,  # True pages = 8
+        num_pages=1,  # True pages = 6
         debug_img_path="debug/member_bot_allitems.png"
     )
     for idx, item in enumerate(all_items, 1):
