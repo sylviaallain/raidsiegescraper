@@ -3,13 +3,15 @@ import numpy as np
 from PIL import Image
 import pytesseract
 import cv2
+import pyautogui
+import time
 
 def read_single_line_item(upper_left, debug_img_path=None):
     # Field definitions: (x_offset, y_offset, width, height)
     fields = {
-        "Player Name": (112, 21, 250, 35),
-        "Level": (53, 80, 45, 27),
-        "Clan XP earned": (895, 45, 110, 40)
+        "Player Name": (112, 16, 250, 55),
+        "Level": (53, 75, 45, 40),
+        "Clan XP earned": (895, 38, 110, 50)
     }
 
     # Take a screenshot of the whole screen
@@ -91,12 +93,60 @@ def read_all_line_items(start_upper_left, num_items=5, item_height=141, debug_im
 
     return results
 
-if __name__ == "__main__":
+def scroll_and_read_all_items(start_upper_left, num_items_per_page=5, item_height=141, num_pages=3, scroll_amount=150, debug_img_path=None):
+    all_results = []
+    for page in range(num_pages):
+        # Read items on the current page
+        page_results = read_all_line_items(
+            start_upper_left=start_upper_left,
+            num_items=num_items_per_page,
+            item_height=item_height,
+            debug_img_path=f"debug/member_bot_allitems_page{page+1}.png" if debug_img_path else None
+        )
+        all_results.extend(page_results)
+        # Scroll down for next page (adjust scroll_amount as needed)
+        pyautogui.moveTo(start_upper_left[0], start_upper_left[1] + num_items_per_page * item_height)
+        pyautogui.scroll(-scroll_amount)
+        # Wait for UI to update
+        time.sleep(1)
+    return all_results
 
-    all_items = read_all_line_items(
+def scroll_and_read_all_items_drag(start_upper_left, scrollbar_coords, drag_pixels=707, num_items_per_page=5, item_height=141, num_pages=2, debug_img_path=None):
+    all_results = []
+    for page in range(num_pages):
+        # Read items on the current page
+        page_results = read_all_line_items(
+            start_upper_left=start_upper_left,
+            num_items=num_items_per_page,
+            item_height=item_height,
+            debug_img_path=f"debug/member_bot_allitems_page{page+1}.png" if debug_img_path else None
+        )
+        all_results.extend(page_results)
+        # Drag the scrollbar down by the specified pixel amount
+        pyautogui.moveTo(*scrollbar_coords)
+        pyautogui.mouseDown()
+        pyautogui.moveRel(0, drag_pixels, duration=0.3)
+        time.sleep(0.5)  # Hold the mouse for half a second before releasing
+        pyautogui.mouseUp()
+        time.sleep(0.5)  # Wait for UI to update
+    return all_results
+
+if __name__ == "__main__":
+    # Set the coordinates for the scrollbar (x, y) where you want to start dragging
+    scrollbar_coords = (1597, 1019)  # <-- Adjust to your scrollbar's position
+    exit_coords = (1198, 429) # Coordinates to hide terminal
+
+    # Click into Raid UI
+    pyautogui.moveTo(*exit_coords)
+    pyautogui.click()
+
+    all_items = scroll_and_read_all_items_drag(
         start_upper_left=(339, 313),
-        num_items=5,
-        item_height=141,
+        scrollbar_coords=scrollbar_coords,
+        drag_pixels=-709,
+        num_items_per_page=5,
+        item_height=142,
+        num_pages=7,
         debug_img_path="debug/member_bot_allitems.png"
     )
     for idx, item in enumerate(all_items, 1):
