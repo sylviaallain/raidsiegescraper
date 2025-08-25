@@ -7,13 +7,14 @@ from PIL import Image
 import pytesseract
 import cv2
 import random
+import os
 
 SLEEP_TIME = 1  # Time to wait between actions
 
 # List of static (x, y) coordinates for each icon/post to click
 posts = {
-    "Post1": (394, 602),
-    "Post2": (521, 770),
+    # "Post1": (394, 602),
+    # "Post2": (521, 770),
     # "Post3": (914, 658),
     # "Post4": (1168, 529),
     # "Post5": (1385, 488),
@@ -33,11 +34,15 @@ posts = {
 }
 
 def_towers = {
-    "DefenseTower1": (1342, 291),
-    "DefenseTower2": (265, 352),
-    "DefenseTower3": (890, 275),
-    "DefenseTower4": (928, 157),
+    # "DefenseTower1": (1342, 291),
+    # "DefenseTower2": (265, 352),
+    # "DefenseTower3": (890, 275),
+    # "DefenseTower4": (928, 157),
     "DefenseTower5": (649, 188),
+}
+
+stronghold = {
+    "Stronghold": (787, 130),
 }
 
 def read_siege_line_item(start_coords, items, post_name=""):
@@ -123,51 +128,97 @@ def read_siege_line_item(start_coords, items, post_name=""):
 def random_sleep():
     time.sleep(random.uniform(1, 1.5))
 
+def read_tower_items(start_coords, last_start_coords, items, line_item_height, tower_name, scrollbar_coords, drag_pixels):
+    results = []
+    # Read first two line items (first page)
+    for i in range(2):
+        item_coords = (start_coords[0], start_coords[1] + i * line_item_height)
+        result = read_siege_line_item(item_coords, items, post_name=f"{tower_name}_item{i+1}")
+        if result.get("Battle Status", "Unknown") != "Unknown":
+            results.append(result)
+    # Move mouse to scroller at scrollbar_coords before dragging
+    pyautogui.moveTo(*scrollbar_coords)
+    pyautogui.mouseDown()
+    pyautogui.moveRel(0, -drag_pixels, duration=0.3)
+    time.sleep(0.5)  # Hold the mouse for half a second before releasing
+    pyautogui.mouseUp()
+    # Read third line item
+    result = read_siege_line_item(last_start_coords, items, post_name=f"{tower_name}_item3")
+    if result.get("Battle Status", "Unknown") != "Unknown":
+        results.append(result)
+    return results
+
+# Constants for coordinates and item definitions
+START_COORDS = (16, 337)
+LAST_START_COORDS = (16, 748) # start coords for last line item
+EXIT_COORDS = (1198, 429)
+TOWER_DEFENSE_REPORT_COORDS = (703, 112)
+POST_DEFENSE_REPORT_COORDS = (422, 110)
+LINE_ITEM_HEIGHT = 259 # Height of each line item block
+SUB_LINE_ITEM_HEIGHT = 168 # Height of each sub-item within a line item
+GROUP_HEADER_HEIGHT = 259 # Height of the group header
+DRAG_PIXELS_INITIAL = 135 # Pixels to drag the scrollbar down so third item is visible
+ITEMS = {
+    "Player 1 Name":  (79,  14, 282, 36),
+    "Player 2 Name":  (565, 14, 282, 36),
+    "Player 1 Power": (232, 173,  85, 25),
+    "Battle Status":  (392, 87, 140, 75),
+    "Battle Log":     (653, 216, 260, 34),
+}
+
+def clear_debug_folder():
+    debug_folder = "debug"
+    if os.path.exists(debug_folder):
+        for filename in os.listdir(debug_folder):
+            file_path = os.path.join(debug_folder, filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+
 if __name__ == "__main__":
-    start_coords = (16, 291)
-    last_start_coords = (16, 748) # start coords for last line item
-    items = {
-        "Player 1 Name":  (79,  60, 285, 36),
-        "Player 2 Name":  (565, 60, 285, 36),
-        "Player 1 Power": (232, 219,  85, 25),
-        "Battle Status":  (392, 133, 140, 75),
-        "Battle Log":     (753, 262, 157, 34),
-    }
+    clear_debug_folder()  # Clear debug files at the start
 
-    exit_coords = (1198, 429)
-    tower_defense_report_coords = (703, 112)
-    post_defense_report_coords = (422, 110)
-    line_item_height = 399 # Height of each line item block
-    sub_line_item_height = 168 # Height of each sub-item within a line item
-
-    pyautogui.moveTo(*exit_coords)
+    pyautogui.moveTo(*EXIT_COORDS)
     pyautogui.click()
     random_sleep()
 
     all_results = {}
 
+    # Read posts as before
     for post, coords in posts.items():
-        # Move to the post and click
         x, y = coords
         pyautogui.moveTo(x, y)
         pyautogui.click()
         random_sleep()
-        # Move to the post defense report button and click
-        pyautogui.moveTo(*post_defense_report_coords)
+        pyautogui.moveTo(*POST_DEFENSE_REPORT_COORDS)
         pyautogui.click()
         random_sleep()
 
-        result = read_siege_line_item(start_coords, items, post_name=post)
-        # Only add results where battle status is not "Unknown"
+        result = read_siege_line_item(START_COORDS, ITEMS, post_name=post)
         if result.get("Battle Status", "Unknown") != "Unknown":
             all_results[post] = result
 
-        # Exit the report
-        pyautogui.moveTo(*exit_coords)
+        pyautogui.moveTo(*EXIT_COORDS)
         pyautogui.click()
         random_sleep()
 
-    # Print formatted results
+    # Combine defense towers and stronghold
+    towers = {**def_towers, **stronghold}
+    for tower_name, coords in towers.items():
+        pyautogui.moveTo(*coords)
+        pyautogui.click()
+        random_sleep()
+        pyautogui.moveTo(*TOWER_DEFENSE_REPORT_COORDS)
+        pyautogui.click()
+        random_sleep()
+        tower_results = read_tower_items(
+            START_COORDS, LAST_START_COORDS, ITEMS, LINE_ITEM_HEIGHT, tower_name, LAST_START_COORDS, DRAG_PIXELS_INITIAL
+        )
+        if tower_results:
+            all_results[tower_name] = tower_results
+        pyautogui.moveTo(*EXIT_COORDS)
+        pyautogui.click()
+        random_sleep()
+
     import json
     print(json.dumps(all_results, indent=4, ensure_ascii=False))
 
