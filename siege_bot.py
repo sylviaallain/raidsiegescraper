@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 import pytesseract
 import cv2
+import random
 
 SLEEP_TIME = 1  # Time to wait between actions
 
@@ -13,9 +14,9 @@ SLEEP_TIME = 1  # Time to wait between actions
 posts = {
     "Post1": (394, 602),
     "Post2": (521, 770),
-    "Post3": (914, 658),
-    "Post4": (1168, 529),
-    "Post5": (1385, 488),
+    # "Post3": (914, 658),
+    # "Post4": (1168, 529),
+    # "Post5": (1385, 488),
     # "Post6": (1225, 427),
     # "Post7": (846, 534),
     # "Post8": (654, 590),
@@ -29,6 +30,14 @@ posts = {
     # "Post16": (372, 263),
     # "Post17": (971, 231),
     # "Post18": (1094, 199)
+}
+
+def_towers = {
+    "DefenseTower1": (1342, 291),
+    "DefenseTower2": (265, 352),
+    "DefenseTower3": (890, 275),
+    "DefenseTower4": (928, 157),
+    "DefenseTower5": (649, 188),
 }
 
 def read_siege_line_item(start_coords, items, post_name=""):
@@ -111,8 +120,12 @@ def read_siege_line_item(start_coords, items, post_name=""):
 
     return results
 
+def random_sleep():
+    time.sleep(random.uniform(1, 1.5))
+
 if __name__ == "__main__":
     start_coords = (16, 291)
+    last_start_coords = (16, 748) # start coords for last line item
     items = {
         "Player 1 Name":  (79,  60, 285, 36),
         "Player 2 Name":  (565, 60, 285, 36),
@@ -121,40 +134,41 @@ if __name__ == "__main__":
         "Battle Log":     (753, 262, 157, 34),
     }
 
+    exit_coords = (1198, 429)
+    tower_defense_report_coords = (703, 112)
+    post_defense_report_coords = (422, 110)
+    line_item_height = 399 # Height of each line item block
+    sub_line_item_height = 168 # Height of each sub-item within a line item
 
-exit_coords = (1198, 429)
-tower_defense_report_coords = (703, 112)
-post_defense_report_coords = (422, 110)
-
-pyautogui.moveTo(*exit_coords)
-pyautogui.click()
-time.sleep(SLEEP_TIME)
-
-all_results = {}
-
-for post, coords in posts.items():
-    # Move to the post and click
-    x, y = coords
-    pyautogui.moveTo(x, y)
-    pyautogui.click()
-    time.sleep(SLEEP_TIME)
-    # Move to the post defense report button and click
-    pyautogui.moveTo(*post_defense_report_coords)
-    pyautogui.click()
-    time.sleep(SLEEP_TIME)
-
-    result = read_siege_line_item(start_coords, items, post_name=post)
-    # Only add results where battle status is not "Unknown"
-    if result.get("Battle Status", "Unknown") != "Unknown":
-        all_results[post] = result
-
-    # Exit the report
     pyautogui.moveTo(*exit_coords)
     pyautogui.click()
-    time.sleep(SLEEP_TIME)
+    random_sleep()
 
-# Print formatted results
-import json
-print(json.dumps(all_results, indent=4, ensure_ascii=False))
+    all_results = {}
+
+    for post, coords in posts.items():
+        # Move to the post and click
+        x, y = coords
+        pyautogui.moveTo(x, y)
+        pyautogui.click()
+        random_sleep()
+        # Move to the post defense report button and click
+        pyautogui.moveTo(*post_defense_report_coords)
+        pyautogui.click()
+        random_sleep()
+
+        result = read_siege_line_item(start_coords, items, post_name=post)
+        # Only add results where battle status is not "Unknown"
+        if result.get("Battle Status", "Unknown") != "Unknown":
+            all_results[post] = result
+
+        # Exit the report
+        pyautogui.moveTo(*exit_coords)
+        pyautogui.click()
+        random_sleep()
+
+    # Print formatted results
+    import json
+    print(json.dumps(all_results, indent=4, ensure_ascii=False))
 
 
