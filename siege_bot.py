@@ -45,6 +45,24 @@ stronghold = {
     "Stronghold": (787, 130),
 }
 
+# Constants for coordinates and item definitions
+START_COORDS = (16, 337)
+LAST_START_COORDS = (16, 748) # start coords for last line item
+EXIT_COORDS = (1198, 429)
+TOWER_DEFENSE_REPORT_COORDS = (703, 112)
+POST_DEFENSE_REPORT_COORDS = (422, 110)
+LINE_ITEM_HEIGHT = 259 # Height of each line item block
+SUB_LINE_ITEM_HEIGHT = 168 # Height of each sub-item within a line item
+GROUP_HEADER_HEIGHT = 259 # Height of the group header
+DRAG_PIXELS_INITIAL = 135 # Pixels to drag the scrollbar down so third item is visible
+ITEMS = {
+    "Player 1 Name":  (79,  14, 282, 36),
+    "Player 2 Name":  (565, 14, 282, 36),
+    "Player 1 Power": (232, 173,  85, 25),
+    "Battle Status":  (392, 87, 140, 75),
+    "Battle Log":     (653, 216, 260, 34),
+}
+
 def read_siege_line_item(start_coords, items, post_name=""):
     print (f"~~~~~Results for: {post_name}~~~~~")
     # Take a screenshot of the whole screen
@@ -128,43 +146,25 @@ def read_siege_line_item(start_coords, items, post_name=""):
 def random_sleep():
     time.sleep(random.uniform(1, 1.5))
 
-def read_tower_items(start_coords, last_start_coords, items, line_item_height, tower_name, scrollbar_coords, drag_pixels):
+def read_tower_items(tower_name):
     results = []
     # Read first two line items (first page)
     for i in range(2):
-        item_coords = (start_coords[0], start_coords[1] + i * line_item_height)
-        result = read_siege_line_item(item_coords, items, post_name=f"{tower_name}_item{i+1}")
+        item_coords = (START_COORDS[0], START_COORDS[1] + i * LINE_ITEM_HEIGHT)
+        result = read_siege_line_item(item_coords, ITEMS, post_name=f"{tower_name}_item{i+1}")
         if result.get("Battle Status", "Unknown") != "Unknown":
             results.append(result)
-    # Move mouse to scroller at scrollbar_coords before dragging
-    pyautogui.moveTo(*scrollbar_coords)
+    # Move mouse to scroller at LAST_START_COORDS before dragging
+    pyautogui.moveTo(*LAST_START_COORDS)
     pyautogui.mouseDown()
-    pyautogui.moveRel(0, -drag_pixels, duration=0.3)
+    pyautogui.moveRel(0, -DRAG_PIXELS_INITIAL, duration=0.3)
     time.sleep(0.5)  # Hold the mouse for half a second before releasing
     pyautogui.mouseUp()
     # Read third line item
-    result = read_siege_line_item(last_start_coords, items, post_name=f"{tower_name}_item3")
+    result = read_siege_line_item(LAST_START_COORDS, ITEMS, post_name=f"{tower_name}_item3")
     if result.get("Battle Status", "Unknown") != "Unknown":
         results.append(result)
     return results
-
-# Constants for coordinates and item definitions
-START_COORDS = (16, 337)
-LAST_START_COORDS = (16, 748) # start coords for last line item
-EXIT_COORDS = (1198, 429)
-TOWER_DEFENSE_REPORT_COORDS = (703, 112)
-POST_DEFENSE_REPORT_COORDS = (422, 110)
-LINE_ITEM_HEIGHT = 259 # Height of each line item block
-SUB_LINE_ITEM_HEIGHT = 168 # Height of each sub-item within a line item
-GROUP_HEADER_HEIGHT = 259 # Height of the group header
-DRAG_PIXELS_INITIAL = 135 # Pixels to drag the scrollbar down so third item is visible
-ITEMS = {
-    "Player 1 Name":  (79,  14, 282, 36),
-    "Player 2 Name":  (565, 14, 282, 36),
-    "Player 1 Power": (232, 173,  85, 25),
-    "Battle Status":  (392, 87, 140, 75),
-    "Battle Log":     (653, 216, 260, 34),
-}
 
 def clear_debug_folder():
     debug_folder = "debug"
@@ -210,9 +210,7 @@ if __name__ == "__main__":
         pyautogui.moveTo(*TOWER_DEFENSE_REPORT_COORDS)
         pyautogui.click()
         random_sleep()
-        tower_results = read_tower_items(
-            START_COORDS, LAST_START_COORDS, ITEMS, LINE_ITEM_HEIGHT, tower_name, LAST_START_COORDS, DRAG_PIXELS_INITIAL
-        )
+        tower_results = read_tower_items(tower_name)
         if tower_results:
             all_results[tower_name] = tower_results
         pyautogui.moveTo(*EXIT_COORDS)
