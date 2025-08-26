@@ -8,13 +8,14 @@ import pytesseract
 import cv2
 import random
 import os
+import re
 
 SLEEP_TIME = 1  # Time to wait between actions
 
 # List of static (x, y) coordinates for each icon/post to click
 posts = {
-    "Post1": (394, 602),
-    "Post2": (521, 770),
+    # "Post1": (394, 602),
+    # "Post2": (521, 770),
     # "Post3": (914, 658),
     # "Post4": (1168, 529),
     # "Post5": (1385, 488),
@@ -66,6 +67,7 @@ POST_DEFENSE_REPORT_COORDS = (422, 110)
 LINE_ITEM_HEIGHT = 259 # Height of each line item block
 LINE_ITEM_HEIGHT_SCROLL = 326 # 1.25x height
 SUB_LINE_ITEM_HEIGHT = 168 # Height of each sub-item within a line item
+SUB_LINE_ITEM_HEIGHT_SCROLL = 210
 GROUP_HEADER_HEIGHT = 126 # Height of the group header
 GROUP_HEADER_HEIGHT_SCROLL = 151 # 1.2x height
 DRAG_PIXELS_INITIAL = 135 # Pixels to drag the scrollbar down so third item is visible
@@ -75,6 +77,10 @@ ITEMS = {
     "Player 1 Power": (232, 173,  85, 25),
     "Battle Status":  (392, 87, 140, 75),
     "Battle Log":     (653, 216, 260, 34),
+}
+SUB_ITEMS = {
+    "Player 2 Name":  (565,  55, 282, 40),
+    "Battle Status":  (392, 95, 140, 75)
 }
 
 def read_siege_line_item(start_coords, items, post_name=""):
@@ -158,13 +164,32 @@ def read_siege_line_item(start_coords, items, post_name=""):
 def random_sleep():
     time.sleep(random.uniform(1, 1.5))
 
+def read_sub_line_items(start_coords, sub_items, battle_status_coords, num_sub_items, post_name):
+    sub_results = []
+    # 1. Click the Battle Status coordinates to open the sub line item
+    print(f"Battle Status coords: {battle_status_coords}")
+    pyautogui.moveTo(*battle_status_coords)
+    pyautogui.click()
+    random_sleep()
+    for i in range(num_sub_items - 1):
+        pyautogui.moveTo(*start_coords)
+        pyautogui.mouseDown()
+        pyautogui.moveRel(0, -SUB_LINE_ITEM_HEIGHT_SCROLL, duration=0.3)
+        time.sleep(0.5)
+        pyautogui.mouseUp()
+        time.sleep(0.5)
+        # 2. Read the sub line item
+        sub_result = read_siege_line_item(start_coords, sub_items, post_name=f"{post_name}_subitem{i+1}")
+        # 3. Store the result
+        sub_results.append(sub_result)
+    return sub_results
+
 def read_tower_items(tower_name):
     results = []
     seen_battles = set()
     group_count = 0
     max_groups = 2 # True groups = 6
 
-    # Now handle additional groups
     while group_count < max_groups:
 
         if len(results) >= 3:
@@ -193,15 +218,13 @@ def read_tower_items(tower_name):
                 pyautogui.mouseUp()
             # Scroll for any additional items in the group
             elif len(results) >= 3:
-                # 2. Scroll the amount of LINE_ITEM_HEIGHT (except for the first in the group, which is already in place after header scroll)
-                print("Scrolling for next item in group...")
                 pyautogui.moveTo(*LAST_START_COORDS)
                 pyautogui.mouseDown()
                 pyautogui.moveRel(0, -LINE_ITEM_HEIGHT_SCROLL, duration=0.3)
                 time.sleep(0.5)
                 pyautogui.mouseUp()
                 time.sleep(0.5)
-            # 3. Read line starting at coords
+            # Read line starting at coords
             result = read_siege_line_item(item_coords, ITEMS, post_name=f"{tower_name}_group{group_count+1}_item{j+1}")
             player1_name = result.get("Player 1 Name", "")
             player1_power = result.get("Player 1 Power", "")
@@ -209,6 +232,17 @@ def read_tower_items(tower_name):
                 return results
             seen_battles.add(player1_name + player1_power)
             if result.get("Battle Status", "Unknown") != "Unknown":
+                # Check for sub line items in Battle Log
+                battle_log = result.get("Battle Log", "")
+                match = re.search(r"\((\d+)\)", battle_log)
+                if match:
+                    num_sub_items = int(match.group(1))
+                    if num_sub_items > 1:
+                        # Get Battle Log coordinates relative to item_coords
+                        battle_log_offset = ITEMS["Battle Log"]
+                        battle_log_coords = (item_coords[0] + battle_log_offset[0], item_coords[1] + battle_log_offset[1])
+                        sub_results = read_sub_line_items(item_coords, SUB_ITEMS, battle_log_coords, num_sub_items, f"{tower_name}_group{group_count+1}_item{j+1}")
+                        result["Retries"] = sub_results
                 results.append(result)
         group_count += 1
 
