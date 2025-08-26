@@ -9,6 +9,9 @@ import cv2
 import random
 import os
 import re
+import csv
+import datetime
+import sqlite3
 
 SLEEP_TIME = 1  # Time to wait between actions
 
@@ -226,6 +229,7 @@ def read_tower_items(tower_name):
                 time.sleep(0.5)
             # Read line starting at coords
             result = read_siege_line_item(item_coords, ITEMS, post_name=f"{tower_name}_group{group_count+1}_item{j+1}")
+            result["Group Number"] = group_count + 1
             player1_name = result.get("Player 1 Name", "")
             player1_power = result.get("Player 1 Power", "")
             if player1_name == "" or player1_name + player1_power in seen_battles:
@@ -242,7 +246,7 @@ def read_tower_items(tower_name):
                         battle_log_offset = ITEMS["Battle Log"]
                         battle_log_coords = (item_coords[0] + battle_log_offset[0], item_coords[1] + battle_log_offset[1])
                         sub_results = read_sub_line_items(item_coords, SUB_ITEMS, battle_log_coords, num_sub_items, f"{tower_name}_group{group_count+1}_item{j+1}")
-                        result["Retries"] = sub_results
+                        result["Previous Attempts"] = sub_results
                 results.append(result)
         group_count += 1
 
@@ -256,8 +260,122 @@ def clear_debug_folder():
             if os.path.isfile(file_path):
                 os.remove(file_path)
 
+def init_db(db_path="siege_records/siege_results.db"):
+    os.makedirs("siege_records", exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS siege_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tower TEXT,
+            group_number INTEGER,
+            battle_id TEXT,
+            player1_name TEXT,
+            player2_name TEXT,
+            player1_power TEXT,
+            battle_status TEXT,
+            battle_log TEXT,
+            is_previous_attempt INTEGER,
+            timestamp TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def save_results_to_csv(all_results, csv_path=None):
+    # Flatten results for CSV
+    rows = []
+    for tower_name, tower_items in all_results.items():
+        for item in tower_items:
+            group_number = item.get("Group Number", "")
+            battle_id = f"{item.get('Player 1 Name', '')}_{item.get('Player 1 Power', '')}"
+            base_row = {
+                "Tower": tower_name,
+                "Group Number": group_number,
+                "Battle ID": battle_id,
+                "Player 1 Name": item.get("Player 1 Name", ""),
+                "Player 2 Name": item.get("Player 2 Name", ""),
+                "Player 1 Power": item.get("Player 1 Power", ""),
+                "Battle Status": item.get("Battle Status", ""),
+                "Battle Log": item.get("Battle Log", ""),
+                "Is Previous Attempt": False
+            }
+            rows.append(base_row)
+            previous_attempts = item.get("Previous Attempts", [])
+            for attempt in previous_attempts:
+                attempt_row = {
+                    "Tower": tower_name,
+                    "Group Number": group_number,
+                    "Battle ID": battle_id,
+                    "Player 1 Name": attempt.get("Player 1 Name", ""),
+                    "Player 2 Name": attempt.get("Player 2 Name", ""),
+                    "Player 1 Power": "",
+                    "Battle Status": attempt.get("Battle Status", ""),
+                    "Battle Log": "",
+                    "Is Previous Attempt": True
+                }
+                rows.append(attempt_row)
+    # Write to CSV with timestamp
+    os.makedirs("siege_records", exist_ok=True)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    csv_file = os.path.join("siege_records", f"siege_results_{timestamp}.csv") if csv_path is None else csv_path
+    with open(csv_file, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=[
+            "Tower", "Group Number", "Battle ID", "Player 1 Name", "Player 2 Name", "Player 1 Power", "Battle Status", "Battle Log", "Is Previous Attempt"
+        ])
+        writer.writeheader()
+        writer.writerows(rows)
+
+def save_results_to_db(all_results, db_path="siege_records/siege_results.db"):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H")
+    for tower_name, tower_items in all_results.items():
+        for item in tower_items:
+            group_number = item.get("Group Number", "")
+            battle_id = f"{item.get('Player 1 Name', '')}_{item.get('Player 1 Power', '')}"
+            # Parent record
+            c.execute("""
+                INSERT INTO siege_results (tower, group_number, battle_id, player1_name, player2_name, player1_power, battle_status, battle_log, is_previous_attempt, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                tower_name,
+                group_number,
+                battle_id,
+                item.get("Player 1 Name", ""),
+                item.get("Player 2 Name", ""),
+                item.get("Player 1 Power", ""),
+                item.get("Battle Status", ""),
+                item.get("Battle Log", ""),
+                0,
+                timestamp
+            ))
+            # Child records
+            previous_attempts = item.get("Previous Attempts", [])
+            for attempt in previous_attempts:
+                c.execute("""
+                    INSERT INTO siege_results (tower, group_number, battle_id, player1_name, player2_name, player1_power, battle_status, battle_log, is_previous_attempt, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    tower_name,
+                    group_number,
+                    battle_id,
+                    attempt.get("Player 1 Name", ""),
+                    attempt.get("Player 2 Name", ""),
+                    "",
+                    attempt.get("Battle Status", ""),
+                    "",
+                    1,
+                    timestamp
+                ))
+    conn.commit()
+    conn.close()
+
+# In your main block, call these after collecting results:
 if __name__ == "__main__":
     clear_debug_folder()  # Clear debug files at the start
+
+    init_db()  # Initialize the database
 
     pyautogui.moveTo(*EXIT_COORDS)
     pyautogui.click()
@@ -284,5 +402,7 @@ if __name__ == "__main__":
 
     import json
     print(json.dumps(all_results, indent=4, ensure_ascii=False))
+    save_results_to_csv(all_results)
+    save_results_to_db(all_results)
 
 
