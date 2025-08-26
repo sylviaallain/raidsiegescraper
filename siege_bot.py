@@ -13,8 +13,8 @@ SLEEP_TIME = 1  # Time to wait between actions
 
 # List of static (x, y) coordinates for each icon/post to click
 posts = {
-    # "Post1": (394, 602),
-    # "Post2": (521, 770),
+    "Post1": (394, 602),
+    "Post2": (521, 770),
     # "Post3": (914, 658),
     # "Post4": (1168, 529),
     # "Post5": (1385, 488),
@@ -161,31 +161,13 @@ def random_sleep():
 def read_tower_items(tower_name):
     results = []
     seen_battles = set()
-    group_count = 1
-    max_groups = 6 # True groups = 6
+    group_count = 0
+    max_groups = 2 # True groups = 6
 
     # Now handle additional groups
     while group_count < max_groups:
-        # Read first two items on same page
-        if len(results) < 2:
-            i = len(results)
-            item_coords = (START_COORDS[0], START_COORDS[1] + i * LINE_ITEM_HEIGHT)
-            result = read_siege_line_item(item_coords, ITEMS, post_name=f"{tower_name}_item{i+1}")
-            if result.get("Battle Status", "Unknown") != "Unknown":
-                results.append(result)
-        elif len(results) == 2:
-            # Move mouse to scroller at LAST_START_COORDS before dragging
-            pyautogui.moveTo(*LAST_START_COORDS)
-            pyautogui.mouseDown()
-            pyautogui.moveRel(0, -DRAG_PIXELS_INITIAL, duration=0.3)
-            time.sleep(0.5)  # Hold the mouse for half a second before releasing
-            pyautogui.mouseUp()
-            # Read third line item
-            result = read_siege_line_item(LAST_START_COORDS, ITEMS, post_name=f"{tower_name}_item3")
-            if result.get("Battle Status", "Unknown") != "Unknown":
-                results.append(result)
 
-        elif len(results) >= 3:
+        if len(results) >= 3:
             # 1. Scroll the amount of GROUP_HEADER_HEIGHT
             print("Scrolling for next group...")
             pyautogui.moveTo(*LAST_START_COORDS)
@@ -195,7 +177,22 @@ def read_tower_items(tower_name):
             pyautogui.mouseUp()
             time.sleep(0.5)
 
-            for j in range(3):
+        for j in range(3):
+            item_coords = LAST_START_COORDS
+            # Read first two items on same page
+            if len(results) < 2:
+                i = len(results)
+                item_coords = (START_COORDS[0], START_COORDS[1] + i * LINE_ITEM_HEIGHT)
+            # Scroll slightly for the third item
+            elif len(results) == 2:
+                # Move mouse to scroller at LAST_START_COORDS before dragging
+                pyautogui.moveTo(*LAST_START_COORDS)
+                pyautogui.mouseDown()
+                pyautogui.moveRel(0, -DRAG_PIXELS_INITIAL, duration=0.3)
+                time.sleep(0.5)  # Hold the mouse for half a second before releasing
+                pyautogui.mouseUp()
+            # Scroll for any additional items in the group
+            elif len(results) >= 3:
                 # 2. Scroll the amount of LINE_ITEM_HEIGHT (except for the first in the group, which is already in place after header scroll)
                 print("Scrolling for next item in group...")
                 pyautogui.moveTo(*LAST_START_COORDS)
@@ -204,16 +201,16 @@ def read_tower_items(tower_name):
                 time.sleep(0.5)
                 pyautogui.mouseUp()
                 time.sleep(0.5)
-                # 3. Read line starting at LAST_START_COORDS
-                result = read_siege_line_item(LAST_START_COORDS, ITEMS, post_name=f"{tower_name}_group{group_count+1}_item{j+1}")
-                player1_name = result.get("Player 1 Name", "")
-                player1_power = result.get("Player 1 Power", "")
-                if player1_name == "" or player1_name + player1_power in seen_battles:
-                    return results
-                seen_battles.add(player1_name + player1_power)
-                if result.get("Battle Status", "Unknown") != "Unknown":
-                    results.append(result)
-            group_count += 1
+            # 3. Read line starting at coords
+            result = read_siege_line_item(item_coords, ITEMS, post_name=f"{tower_name}_group{group_count+1}_item{j+1}")
+            player1_name = result.get("Player 1 Name", "")
+            player1_power = result.get("Player 1 Power", "")
+            if player1_name == "" or player1_name + player1_power in seen_battles:
+                return results
+            seen_battles.add(player1_name + player1_power)
+            if result.get("Battle Status", "Unknown") != "Unknown":
+                results.append(result)
+        group_count += 1
 
     return results
 
@@ -234,31 +231,14 @@ if __name__ == "__main__":
 
     all_results = {}
 
-    # Read posts as before
-    for post, coords in posts.items():
-        x, y = coords
-        pyautogui.moveTo(x, y)
-        pyautogui.click()
-        random_sleep()
-        pyautogui.moveTo(*POST_DEFENSE_REPORT_COORDS)
-        pyautogui.click()
-        random_sleep()
-
-        result = read_siege_line_item(START_COORDS, ITEMS, post_name=post)
-        if result.get("Battle Status", "Unknown") != "Unknown":
-            all_results[post] = result
-
-        pyautogui.moveTo(*EXIT_COORDS)
-        pyautogui.click()
-        random_sleep()
-
     # Combine defense towers and stronghold
-    towers = {**magic_towers, **def_towers, **mana_shrines, **stronghold}
+    towers = {**posts, **magic_towers, **def_towers, **mana_shrines, **stronghold}
     for tower_name, coords in towers.items():
         pyautogui.moveTo(*coords)
         pyautogui.click()
         random_sleep()
-        pyautogui.moveTo(*TOWER_DEFENSE_REPORT_COORDS)
+        report_coords = POST_DEFENSE_REPORT_COORDS if tower_name in posts else TOWER_DEFENSE_REPORT_COORDS
+        pyautogui.moveTo(*report_coords)
         pyautogui.click()
         random_sleep()
         tower_results = read_tower_items(tower_name)
