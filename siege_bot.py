@@ -54,11 +54,11 @@ def_towers = {
 
 mana_shrines = {
     # "ManaShrine1": (1302, 216),
-    # "ManaShrine2": (470, 172),
+    "ManaShrine2": (470, 172),
 }
 
 stronghold = {
-    "Stronghold": (787, 130),
+    # "Stronghold": (787, 130),
 }
 
 # Constants for coordinates and item definitions
@@ -72,18 +72,18 @@ LINE_ITEM_HEIGHT_SCROLL = 326 # 1.25x height
 SUB_LINE_ITEM_HEIGHT = 168 # Height of each sub-item within a line item
 SUB_LINE_ITEM_HEIGHT_SCROLL = 210
 GROUP_HEADER_HEIGHT = 126 # Height of the group header
-GROUP_HEADER_HEIGHT_SCROLL = 151 # 1.2x height
+GROUP_HEADER_HEIGHT_SCROLL = 153 # 1.25x height
 DRAG_PIXELS_INITIAL = 135 # Pixels to drag the scrollbar down so third item is visible
 ITEMS = {
-    "Player 1 Name":  (79,  14, 282, 36),
-    "Player 2 Name":  (565, 14, 282, 36),
-    "Player 1 Power": (232, 173,  85, 25),
-    "Battle Status":  (392, 87, 140, 75),
-    "Battle Log":     (653, 216, 260, 34),
+    "Player 1 Name":  (79,  12, 282, 44),
+    "Player 2 Name":  (565, 12, 282, 44),
+    "Player 1 Power": (232, 173,  85, 30),
+    "Battle Status":  (392, 87, 140, 77),
+    "Battle Log":     (653, 214, 260, 38),
 }
 SUB_ITEMS = {
     "Player 2 Name":  (565,  55, 282, 40),
-    "Battle Status":  (392, 95, 140, 75)
+    "Battle Status":  (391, 86, 140, 77)
 }
 
 def read_siege_line_item(start_coords, items, post_name=""):
@@ -120,9 +120,10 @@ def read_siege_line_item(start_coords, items, post_name=""):
             defeat_res = cv2.matchTemplate(crop_eq, defeat_eq, cv2.TM_CCOEFF_NORMED)
             victory_score = victory_res.max()
             defeat_score = defeat_res.max()
-            if victory_score > defeat_score and victory_score > 0.5:
+            print(f"Debug: {post_name} - Victory score: {victory_score}, Defeat score: {defeat_score}")
+            if victory_score > defeat_score and victory_score > 0.4:
                 results[field] = "Victory"
-            elif defeat_score > victory_score and defeat_score > 0.5:
+            elif defeat_score > victory_score and defeat_score > 0.4:
                 results[field] = "Defeat"
             else:
                 results[field] = "Unknown"
@@ -171,7 +172,7 @@ def read_sub_line_items(start_coords, sub_items, battle_status_coords, num_sub_i
     sub_results = []
     # 1. Click the Battle Status coordinates to open the sub line item
     print(f"Battle Status coords: {battle_status_coords}")
-    pyautogui.moveTo(*battle_status_coords)
+    pyautogui.moveTo(battle_status_coords[0], battle_status_coords[1] + 3)
     pyautogui.click()
     random_sleep()
     for i in range(num_sub_items - 1):
@@ -183,6 +184,19 @@ def read_sub_line_items(start_coords, sub_items, battle_status_coords, num_sub_i
         time.sleep(0.5)
         # 2. Read the sub line item
         sub_result = read_siege_line_item(start_coords, sub_items, post_name=f"{post_name}_subitem{i+1}")
+        player2_name = sub_result.get("Player 2 Name", "")
+        # If we hit an empty string, we've scrolled too far
+        if player2_name == "":
+            remaining = num_sub_items - i - 1
+            # Calculate new starting Y coordinate
+            new_start_y = LAST_START_COORDS[1] - SUB_LINE_ITEM_HEIGHT * (remaining - 1)
+            for j in range(remaining):
+                coords = (LAST_START_COORDS[0], new_start_y + j * SUB_LINE_ITEM_HEIGHT)
+                sub_result = read_siege_line_item(coords, sub_items, post_name=f"{post_name}_subitem{i+1+j}")
+                player2_name = sub_result.get("Player 2 Name", "")
+                if player2_name != "":
+                    sub_results.append(sub_result)
+            break
         # 3. Store the result
         sub_results.append(sub_result)
     return sub_results
@@ -191,7 +205,7 @@ def read_tower_items(tower_name):
     results = []
     seen_battles = set()
     group_count = 0
-    max_groups = 2 # True groups = 6
+    max_groups = 6 # True groups = 6
 
     while group_count < max_groups:
 
@@ -232,6 +246,7 @@ def read_tower_items(tower_name):
             result["Group Number"] = group_count + 1
             player1_name = result.get("Player 1 Name", "")
             player1_power = result.get("Player 1 Power", "")
+            print(f"Read item: {result}")
             if player1_name == "" or player1_name + player1_power in seen_battles:
                 return results
             seen_battles.add(player1_name + player1_power)
@@ -239,7 +254,8 @@ def read_tower_items(tower_name):
                 # Check for sub line items in Battle Log
                 battle_log = result.get("Battle Log", "")
                 match = re.search(r"\((\d+)\)", battle_log)
-                if match:
+                # Only open Battle Log if it doesn't contain "Hide"
+                if match and "Hide" not in battle_log:
                     num_sub_items = int(match.group(1))
                     if num_sub_items > 1:
                         # Get Battle Log coordinates relative to item_coords
@@ -317,7 +333,7 @@ def save_results_to_csv(all_results, csv_path=None):
                 rows.append(attempt_row)
     # Write to CSV with timestamp
     os.makedirs("siege_records", exist_ok=True)
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H")
     csv_file = os.path.join("siege_records", f"siege_results_{timestamp}.csv") if csv_path is None else csv_path
     with open(csv_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=[
@@ -329,7 +345,7 @@ def save_results_to_csv(all_results, csv_path=None):
 def save_results_to_db(all_results, db_path="siege_records/siege_results.db"):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
     for tower_name, tower_items in all_results.items():
         for item in tower_items:
             group_number = item.get("Group Number", "")
