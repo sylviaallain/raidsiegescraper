@@ -9,6 +9,7 @@ import csv
 from datetime import datetime
 import argparse
 import os
+import sqlite3
 
 def read_single_line_item(upper_left, debug_img_path=None):
     # Field definitions: (x_offset, y_offset, width, height)
@@ -171,6 +172,41 @@ def clear_debug_folder():
             if os.path.isfile(file_path):
                 os.remove(file_path)
 
+def init_members_db(db_path="raid.db"):
+    os.makedirs("member_records", exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_name TEXT,
+            level TEXT,
+            clan_xp_earned TEXT,
+            is_opponent INTEGER,
+            timestamp TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def save_members_to_db(items, is_opponent, db_path="raid.db"):
+    conn = sqlite3.connect(db_path)
+    c = conn.cursor()
+    timestamp = datetime.now().strftime("%Y-%m-%d")
+    for item in items:
+        name = item.get("Player Name", "").strip()
+        # Skip if name is empty or looks like a header
+        if not name or ("Player" in name or "Power" in name):
+            continue
+        level = item.get("Level", "").strip()
+        clan_xp_earned = item.get("Clan XP earned", "").strip()
+        c.execute("""
+            INSERT INTO members (player_name, level, clan_xp_earned, is_opponent, timestamp)
+            VALUES (?, ?, ?, ?, ?)
+        """, (name, level, clan_xp_earned, int(is_opponent), timestamp))
+    conn.commit()
+    conn.close()
+
 if __name__ == "__main__":
     clear_debug_folder()  # Clear debug files at the start
 
@@ -209,3 +245,5 @@ if __name__ == "__main__":
         for k, v in item.items():
             print(f"  {k}: {v}")
     save_to_csv(all_items, filename)
+    init_members_db()
+    save_members_to_db(all_items, args.is_opponent)

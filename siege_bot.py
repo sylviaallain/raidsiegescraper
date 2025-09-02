@@ -17,48 +17,48 @@ SLEEP_TIME = 1  # Time to wait between actions
 
 # List of static (x, y) coordinates for each icon/post to click
 posts = {
-    "Post1": (394, 602),
-    "Post2": (521, 770),
-    "Post3": (914, 658),
-    "Post4": (1168, 529),
-    "Post5": (1385, 488),
-    "Post6": (1225, 427),
-    "Post7": (846, 534),
-    "Post8": (654, 590),
-    "Post9": (446, 498),
-    "Post10": (598, 500),
-    "Post11": (771, 488),
-    "Post12": (998, 476),
-    "Post13": (1175, 299),
-    "Post14": (832, 397),
-    "Post15": (694, 412),
-    "Post16": (372, 263),
-    "Post17": (971, 231),
-    "Post18": (1094, 199)
+    # "Post1": (394, 602),
+    # "Post2": (521, 770),
+    # "Post3": (914, 658),
+    # "Post4": (1168, 529),
+    # "Post5": (1385, 488),
+    # "Post6": (1225, 427),
+    # "Post7": (846, 534),
+    # "Post8": (654, 590),
+    # "Post9": (446, 498),
+    # "Post10": (598, 500),
+    # "Post11": (771, 488),
+    # "Post12": (998, 476),
+    # "Post13": (1175, 299),
+    # "Post14": (832, 397),
+    # "Post15": (694, 412),
+    # "Post16": (372, 263),
+    # "Post17": (971, 231),
+    # "Post18": (1094, 199)
 }
 
 magic_towers = {
-    "MagicTower1": (1111, 327),
-    "MagicTower2": (482, 289),
-    "MagicTower3": (578, 242),
-    "MagicTower4": (830, 214),
+    # "MagicTower1": (1111, 327),
+    # "MagicTower2": (482, 289),
+    # "MagicTower3": (578, 242),
+    # "MagicTower4": (830, 214),
 }
 
 def_towers = {
-    "DefenseTower1": (1342, 291),
-    "DefenseTower2": (265, 352),
-    "DefenseTower3": (890, 275),
-    "DefenseTower4": (928, 157),
-    "DefenseTower5": (649, 188),
+    # "DefenseTower1": (1342, 291),
+    # "DefenseTower2": (265, 352),
+    # "DefenseTower3": (890, 275),
+    # "DefenseTower4": (928, 157),
+    # "DefenseTower5": (649, 188),
 }
 
 mana_shrines = {
-    "ManaShrine1": (1302, 216),
-    "ManaShrine2": (470, 172),
+    # "ManaShrine1": (1302, 216),
+    # "ManaShrine2": (470, 172),
 }
 
 stronghold = {
-    "Stronghold": (787, 130),
+    # "Stronghold": (787, 130),
 }
 
 # Constants for coordinates and item definitions
@@ -82,6 +82,7 @@ ITEMS = {
     "Battle Log":     (653, 214, 260, 38),
 }
 SUB_ITEMS = {
+    "Player 1 Name":  (79,  55, 282, 44),
     "Player 2 Name":  (565,  55, 282, 40),
     "Battle Status":  (391, 86, 140, 77)
 }
@@ -167,7 +168,7 @@ def read_siege_line_item(start_coords, items, post_name=""):
 def random_sleep():
     time.sleep(random.uniform(1, 1.5))
 
-def read_sub_line_items(start_coords, sub_items, battle_status_coords, num_sub_items, post_name):
+def read_sub_line_items(start_coords, sub_items, battle_status_coords, num_sub_items, post_name, expected_player1_name=""):
     sub_results = []
     # 1. Click the Battle Status coordinates to open the sub line item
     pyautogui.moveTo(battle_status_coords[0], battle_status_coords[1] + 3)
@@ -182,6 +183,7 @@ def read_sub_line_items(start_coords, sub_items, battle_status_coords, num_sub_i
         time.sleep(0.5)
         # 2. Read the sub line item
         sub_result = read_siege_line_item(start_coords, sub_items, post_name=f"{post_name}_subitem{i+1}")
+        player1_name = sub_result.get("Player 1 Name", "")
         player2_name = sub_result.get("Player 2 Name", "")
         # If we hit an empty string, we've scrolled too far
         if player2_name == "":
@@ -190,6 +192,20 @@ def read_sub_line_items(start_coords, sub_items, battle_status_coords, num_sub_i
             new_start_y = LAST_START_COORDS[1] - SUB_LINE_ITEM_HEIGHT * (remaining - 1)
             for j in range(remaining):
                 coords = (LAST_START_COORDS[0], new_start_y + j * SUB_LINE_ITEM_HEIGHT)
+                sub_result = read_siege_line_item(coords, sub_items, post_name=f"{post_name}_subitem{i+1+j}")
+                player2_name = sub_result.get("Player 2 Name", "")
+                if player2_name != "":
+                    sub_results.append(sub_result)
+            break
+        # If player1_name doesn't match expected, we've hit the end of the scroll
+        if player1_name != expected_player1_name:
+            print(f"Expected Player 1 Name '{expected_player1_name}' but got '{player1_name}'. Ending sub-item read.")
+            remaining = num_sub_items - i - 1
+            print(f"{remaining} sub-items remaining to read.")
+            # Calculate new starting Y coordinate
+            new_start_y = start_coords[1] + SUB_LINE_ITEM_HEIGHT
+            for j in range(remaining):
+                coords = (start_coords[0], new_start_y + j * SUB_LINE_ITEM_HEIGHT)
                 sub_result = read_siege_line_item(coords, sub_items, post_name=f"{post_name}_subitem{i+1+j}")
                 player2_name = sub_result.get("Player 2 Name", "")
                 if player2_name != "":
@@ -257,7 +273,7 @@ def read_tower_items(tower_name):
                         # Get Battle Log coordinates relative to item_coords
                         battle_log_offset = ITEMS["Battle Log"]
                         battle_log_coords = (item_coords[0] + battle_log_offset[0], item_coords[1] + battle_log_offset[1])
-                        sub_results = read_sub_line_items(item_coords, SUB_ITEMS, battle_log_coords, num_sub_items, f"{tower_name}_group{group_count+1}_item{j+1}")
+                        sub_results = read_sub_line_items(item_coords, SUB_ITEMS, battle_log_coords, num_sub_items, f"{tower_name}_group{group_count+1}_item{j+1}", expected_player1_name=player1_name)
                         result["Previous Attempts"] = sub_results
                 results.append(result)
         group_count += 1
@@ -272,7 +288,7 @@ def clear_debug_folder():
             if os.path.isfile(file_path):
                 os.remove(file_path)
 
-def init_db(db_path="siege_records/siege_results.db"):
+def init_db(db_path="raid.db"):
     os.makedirs("siege_records", exist_ok=True)
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
@@ -338,7 +354,7 @@ def save_results_to_csv(all_results, csv_path=None):
         writer.writeheader()
         writer.writerows(rows)
 
-def save_results_to_db(all_results, db_path="siege_records/siege_results.db"):
+def save_results_to_db(all_results, db_path="raid.db"):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M")
