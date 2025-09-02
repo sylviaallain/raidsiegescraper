@@ -7,6 +7,8 @@ import pyautogui
 import time
 import csv
 from datetime import datetime
+import argparse
+import os
 
 def read_single_line_item(upper_left, debug_img_path=None):
     # Field definitions: (x_offset, y_offset, width, height)
@@ -115,30 +117,40 @@ def read_all_line_items(start_upper_left, num_items=5, item_height=141, debug_im
 
 def scroll_and_read_all_items_drag(start_upper_left, scrollbar_coords, drag_pixels=707, num_items_per_page=5, item_height=141, num_pages=2, debug_img_path=None):
     all_results = []
+    last_page_y = 308  # Y coordinate of start of last page
     for page in range(num_pages):
+        # For the last page, adjust the start Y coordinate
+        if page == num_pages - 1:
+            page_start = (start_upper_left[0], last_page_y)
+        else:
+            page_start = start_upper_left
         # Read items on the current page
         page_results = read_all_line_items(
-            start_upper_left=start_upper_left,
+            start_upper_left=page_start,
             num_items=num_items_per_page,
             item_height=item_height,
             debug_img_path=f"debug/member_bot_allitems_page{page+1}.png" if debug_img_path else None
         )
         all_results.extend(page_results)
-        # Drag the scrollbar down by the specified pixel amount
-        pyautogui.moveTo(*scrollbar_coords)
-        pyautogui.mouseDown()
-        pyautogui.moveRel(0, drag_pixels, duration=0.3)
-        time.sleep(0.5)  # Hold the mouse for half a second before releasing
-        pyautogui.mouseUp()
-        time.sleep(0.5)  # Wait for UI to update
+        # Drag the scrollbar down by the specified pixel amount, except after last page
+        if page < num_pages - 1:
+            pyautogui.moveTo(*scrollbar_coords)
+            pyautogui.mouseDown()
+            pyautogui.moveRel(0, drag_pixels, duration=0.3)
+            time.sleep(0.5)  # Hold the mouse for half a second before releasing
+            pyautogui.mouseUp()
+            time.sleep(0.5)  # Wait for UI to update
     return all_results
 
 def save_to_csv(items, filename=None):
-    # Deduplicate by Player Name
+    # Deduplicate by Player Name, skip invalid names
     deduped = {}
     for item in items:
         name = item.get("Player Name", "").strip()
-        if name and name not in deduped:
+        # Skip if name is empty or looks like a header
+        if not name or ("Player" in name or "Power" in name):
+            continue
+        if name not in deduped:
             deduped[name] = item
     # Write to CSV
     fieldnames = ["Player Name", "Level", "Clan XP earned"]
@@ -151,19 +163,42 @@ def save_to_csv(items, filename=None):
         for record in deduped.values():
             writer.writerow(record)
 
+def clear_debug_folder():
+    debug_folder = "debug"
+    if os.path.exists(debug_folder):
+        for filename in os.listdir(debug_folder):
+            file_path = os.path.join(debug_folder, filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+
 if __name__ == "__main__":
-    # Set the coordinates for the scrollbar (x, y) where you want to start dragging
+    clear_debug_folder()  # Clear debug files at the start
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--is_opponent", action="store_true", help="Read opponent member list")
+    args = parser.parse_args()
+
     scrollbar_coords = (1597, 1019)  # <-- Adjust to your scrollbar's position
     exit_coords = (1198, 429) # Coordinates to hide terminal
 
-    # Click into Raid UI
     pyautogui.moveTo(*exit_coords)
     pyautogui.click()
 
+    opponent_coords = (330, 213)  # Coordinates of the first item in the opponent list
+    member_coords = (339, 313)    # Coordinates of the first item in the member list
+    date_str = datetime.now().strftime("%Y_%m_%d")
+
+    if args.is_opponent:
+        start_coords = opponent_coords
+        filename = f"member_records/opponents_{date_str}.csv"
+    else:
+        start_coords = member_coords
+        filename = f"member_records/members_{date_str}.csv"
+
     all_items = scroll_and_read_all_items_drag(
-        start_upper_left=(339, 313),
+        start_upper_left=start_coords,
         scrollbar_coords=scrollbar_coords,
-        drag_pixels= -886,  # Has one overlapping member: -709,
+        drag_pixels= -884,  # Has one overlapping member: -709,
         num_items_per_page=5,
         item_height=142,
         num_pages=6,  # True pages = 6
@@ -173,5 +208,4 @@ if __name__ == "__main__":
         print(f"Line Item {idx}:")
         for k, v in item.items():
             print(f"  {k}: {v}")
-    # Save deduped results to CSV with date in filename
-    save_to_csv(all_items)
+    save_to_csv(all_items, filename)

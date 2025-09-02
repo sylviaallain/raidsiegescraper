@@ -17,48 +17,48 @@ SLEEP_TIME = 1  # Time to wait between actions
 
 # List of static (x, y) coordinates for each icon/post to click
 posts = {
-    # "Post1": (394, 602),
-    # "Post2": (521, 770),
-    # "Post3": (914, 658),
-    # "Post4": (1168, 529),
-    # "Post5": (1385, 488),
-    # "Post6": (1225, 427),
-    # "Post7": (846, 534),
-    # "Post8": (654, 590),
-    # "Post9": (446, 498),
-    # "Post10": (598, 500),
-    # "Post11": (771, 488),
-    # "Post12": (998, 476),
-    # "Post13": (1175, 299),
-    # "Post14": (832, 397),
-    # "Post15": (694, 412),
-    # "Post16": (372, 263),
-    # "Post17": (971, 231),
-    # "Post18": (1094, 199)
+    "Post1": (394, 602),
+    "Post2": (521, 770),
+    "Post3": (914, 658),
+    "Post4": (1168, 529),
+    "Post5": (1385, 488),
+    "Post6": (1225, 427),
+    "Post7": (846, 534),
+    "Post8": (654, 590),
+    "Post9": (446, 498),
+    "Post10": (598, 500),
+    "Post11": (771, 488),
+    "Post12": (998, 476),
+    "Post13": (1175, 299),
+    "Post14": (832, 397),
+    "Post15": (694, 412),
+    "Post16": (372, 263),
+    "Post17": (971, 231),
+    "Post18": (1094, 199)
 }
 
 magic_towers = {
-    # "MagicTower1": (1111, 327),
-    # "MagicTower2": (482, 289),
-    # "MagicTower3": (578, 242),
-    # "MagicTower4": (830, 214),
+    "MagicTower1": (1111, 327),
+    "MagicTower2": (482, 289),
+    "MagicTower3": (578, 242),
+    "MagicTower4": (830, 214),
 }
 
 def_towers = {
-    # "DefenseTower1": (1342, 291),
-    # "DefenseTower2": (265, 352),
-    # "DefenseTower3": (890, 275),
-    # "DefenseTower4": (928, 157),
-    # "DefenseTower5": (649, 188),
+    "DefenseTower1": (1342, 291),
+    "DefenseTower2": (265, 352),
+    "DefenseTower3": (890, 275),
+    "DefenseTower4": (928, 157),
+    "DefenseTower5": (649, 188),
 }
 
 mana_shrines = {
-    # "ManaShrine1": (1302, 216),
+    "ManaShrine1": (1302, 216),
     "ManaShrine2": (470, 172),
 }
 
 stronghold = {
-    # "Stronghold": (787, 130),
+    "Stronghold": (787, 130),
 }
 
 # Constants for coordinates and item definitions
@@ -120,7 +120,6 @@ def read_siege_line_item(start_coords, items, post_name=""):
             defeat_res = cv2.matchTemplate(crop_eq, defeat_eq, cv2.TM_CCOEFF_NORMED)
             victory_score = victory_res.max()
             defeat_score = defeat_res.max()
-            print(f"Debug: {post_name} - Victory score: {victory_score}, Defeat score: {defeat_score}")
             if victory_score > defeat_score and victory_score > 0.4:
                 results[field] = "Victory"
             elif defeat_score > victory_score and defeat_score > 0.4:
@@ -171,7 +170,6 @@ def random_sleep():
 def read_sub_line_items(start_coords, sub_items, battle_status_coords, num_sub_items, post_name):
     sub_results = []
     # 1. Click the Battle Status coordinates to open the sub line item
-    print(f"Battle Status coords: {battle_status_coords}")
     pyautogui.moveTo(battle_status_coords[0], battle_status_coords[1] + 3)
     pyautogui.click()
     random_sleep()
@@ -211,7 +209,6 @@ def read_tower_items(tower_name):
 
         if len(results) >= 3:
             # 1. Scroll the amount of GROUP_HEADER_HEIGHT
-            print("Scrolling for next group...")
             pyautogui.moveTo(*LAST_START_COORDS)
             pyautogui.mouseDown()
             pyautogui.moveRel(0, -GROUP_HEADER_HEIGHT_SCROLL, duration=0.3)
@@ -246,8 +243,7 @@ def read_tower_items(tower_name):
             result["Group Number"] = group_count + 1
             player1_name = result.get("Player 1 Name", "")
             player1_power = result.get("Player 1 Power", "")
-            print(f"Read item: {result}")
-            if player1_name == "" or player1_name + player1_power in seen_battles:
+            if player1_name == "" or ("eam" in player1_name and "ower" in player1_name) or player1_name + player1_power in seen_battles:
                 return results
             seen_battles.add(player1_name + player1_power)
             if result.get("Battle Status", "Unknown") != "Unknown":
