@@ -17,48 +17,48 @@ SLEEP_TIME = 1  # Time to wait between actions
 
 # List of static (x, y) coordinates for each icon/post to click
 posts = {
-    # "Post1": (394, 602),
-    # "Post2": (521, 770),
-    # "Post3": (914, 658),
-    # "Post4": (1168, 529),
-    # "Post5": (1385, 488),
-    # "Post6": (1225, 427),
-    # "Post7": (846, 534),
-    # "Post8": (654, 590),
-    # "Post9": (446, 498),
-    # "Post10": (598, 500),
-    # "Post11": (771, 488),
-    # "Post12": (998, 476),
-    # "Post13": (1175, 299),
-    # "Post14": (832, 397),
-    # "Post15": (694, 412),
-    # "Post16": (372, 263),
-    # "Post17": (971, 231),
-    # "Post18": (1094, 199)
+    "Post1": (394, 602),
+    "Post2": (521, 770),
+    "Post3": (914, 658),
+    "Post4": (1168, 529),
+    "Post5": (1385, 488),
+    "Post6": (1225, 427),
+    "Post7": (846, 534),
+    "Post8": (654, 590),
+    "Post9": (446, 498),
+    "Post10": (598, 500),
+    "Post11": (771, 488),
+    "Post12": (998, 476),
+    "Post13": (1175, 299),
+    "Post14": (832, 397),
+    "Post15": (694, 412),
+    "Post16": (372, 263),
+    "Post17": (971, 231),
+    "Post18": (1094, 199)
 }
 
 magic_towers = {
-    # "MagicTower1": (1111, 327),
-    # "MagicTower2": (482, 289),
-    # "MagicTower3": (578, 242),
-    # "MagicTower4": (830, 214),
+    "MagicTower1": (1111, 327),
+    "MagicTower2": (482, 289),
+    "MagicTower3": (578, 242),
+    "MagicTower4": (830, 214),
 }
 
 def_towers = {
-    # "DefenseTower1": (1342, 291),
-    # "DefenseTower2": (265, 352),
-    # "DefenseTower3": (890, 275),
-    # "DefenseTower4": (928, 157),
-    # "DefenseTower5": (649, 188),
+    "DefenseTower1": (1342, 291),
+    "DefenseTower2": (265, 352),
+    "DefenseTower3": (890, 275),
+    "DefenseTower4": (928, 157),
+    "DefenseTower5": (649, 188),
 }
 
 mana_shrines = {
-    # "ManaShrine1": (1302, 216),
-    # "ManaShrine2": (470, 172),
+    "ManaShrine1": (1302, 216),
+    "ManaShrine2": (470, 172),
 }
 
 stronghold = {
-    # "Stronghold": (787, 130),
+    "Stronghold": (787, 130),
 }
 
 # Constants for coordinates and item definitions

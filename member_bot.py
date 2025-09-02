@@ -193,6 +193,10 @@ def save_members_to_db(items, is_opponent, db_path="raid.db"):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
     timestamp = datetime.now().strftime("%Y-%m-%d")
+    # Delete all records with the same timestamp and is_opponent value
+    c.execute("""
+        DELETE FROM members WHERE timestamp = ? AND is_opponent = ?
+    """, (timestamp, int(is_opponent)))
     for item in items:
         name = item.get("Player Name", "").strip()
         # Skip if name is empty or looks like a header
